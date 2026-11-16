@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<title>Engineering Connection Explorer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="brand"><b>Engineering Connection Explorer</b><span>Fiktive demodata · fysisk kabling og registrerte stier</span></div>
+  <div class="controls">
+    <label>Datasett
+      <select id="dataset">
+        <option value="base">Basis (gyldig)</option>
+        <option value="errors">Feildatasett (3 bevisste feil)</option>
+        <option value="revb">Revisjon B – endringer mot basis</option>
+      </select>
+    </label>
+    <label>Rom <select id="roomFilter"><option value="">Alle rom</option></select></label>
+    <label>System <select id="sysFilter"><option value="">Alle systemer</option></select></label>
+    <button id="clear" type="button">Nullstill valg</button>
+    <a class="dl" href="../out/engineering-connections.drawio" download>Last ned .drawio</a>
+  </div>
+</header>
+<main>
+  <section class="canvas">
+    <div class="status" id="status"></div>
+    <div class="svgwrap" id="svgwrap"></div>
+    <div class="legend" id="legend"></div>
+  </section>
+  <aside>
+    <div class="panel" id="detail"><h2>Detaljer</h2><p class="muted">Klikk på et utstyr for å fremheve registrerte forbindelsesstier, eller på en linje for kabeldetaljer.</p></div>
+    <div class="panel" id="logical"></div>
+    <div class="panel" id="changes"></div>
+    <div class="panel" id="issues"></div>
+  </aside>
+</main>
+<script src="../out/data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+tag,description,type,system,room_id,cabinet_id,rack_u,ports,model
+OWS-101,Operatørstasjon 1,operator_station,OPS,RM-100,,,NIC1,Fiktiv WS-200
+OWS-102,Operatørstasjon 2,operator_station,OPS,RM-100,,,NIC1,Fiktiv WS-200
+TO-101,Uttakspanel kontrollpult,copper_patch_panel,NETT,RM-100,,,F01-F04;R01-R04,Fiktiv TO-4
+FPP-110-01,Fiberpatchpanel MER,fiber_patch_panel,NETT,RM-110,CAB-110-A,42,F01-F12;R01-R12,Fiktiv FP-12 LC
+CPP-110-01,Kobberpatchpanel MER,copper_patch_panel,NETT,RM-110,CAB-110-A,41,F01-F24;R01-R24,Fiktiv CP-24 C6A
+SW-110-01,Kjernesvitsj,switch,NETT,RM-110,CAB-110-A,40,1-28,Fiktiv CS-28
+SRV-110-01,VMS-server,server,CCTV,RM-110,CAB-110-A,30,NIC1;NIC2,Fiktiv SR-2U
+FPP-210-01,Fiberpatchpanel Nord,fiber_patch_panel,NETT,RM-210,CAB-210-A,22,F01-F06;R01-R06,Fiktiv FP-6 LC
+CPP-210-01,Kobberpatchpanel Nord,copper_patch_panel,NETT,RM-210,CAB-210-A,21,F01-F12;R01-R12,Fiktiv CP-12 C6A
+SW-210-01,Aksessvitsj Nord,switch,NETT,RM-210,CAB-210-A,20,1-28,Fiktiv AS-28P
+CAM-211,Kamera perrong N1,camera,CCTV,RM-210,,,ETH0,Fiktiv IPC-4
+CAM-212,Kamera perrong N2,camera,CCTV,RM-210,,,ETH0,Fiktiv IPC-4
+CAM-213,Kamera trapp Nord,camera,CCTV,RM-210,,,ETH0,Fiktiv IPC-4
+CAM-214,Kamera inngang Nord,camera,CCTV,RM-210,,,ETH0,Fiktiv IPC-4
+FPP-310-01,Fiberpatchpanel Sør,fiber_patch_panel,NETT,RM-310,CAB-310-A,22,F01-F06;R01-R06,Fiktiv FP-6 LC
+CPP-310-01,Kobberpatchpanel Sør,copper_patch_panel,NETT,RM-310,CAB-310-A,21,F01-F12;R01-R12,Fiktiv CP-12 C6A
+SW-310-01,Aksessvitsj Sør,switch,NETT,RM-310,CAB-310-A,20,1-28,Fiktiv AS-28P
+CAM-311,Kamera perrong S1,camera,CCTV,RM-310,,,ETH0,Fiktiv IPC-4
+CAM-312,Kamera perrong S2,camera,CCTV,RM-310,,,ETH0,Fiktiv IPC-4
+CAM-313,Kamera heis Sør,camera,CCTV,RM-310,,,ETH0,Fiktiv IPC-4

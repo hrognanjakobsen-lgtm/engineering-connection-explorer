@@ -1,0 +1,44 @@
+{
+  "slots": {
+    "CAM-211": {
+      "room": "RM-210",
+      "slot": 0
+    },
+    "CAM-212": {
+      "room": "RM-210",
+      "slot": 1
+    },
+    "CAM-213": {
+      "room": "RM-210",
+      "slot": 2
+    },
+    "CAM-214": {
+      "room": "RM-210",
+      "slot": 3
+    },
+    "CAM-311": {
+      "room": "RM-310",
+      "slot": 0
+    },
+    "CAM-312": {
+      "room": "RM-310",
+      "slot": 1
+    },
+    "CAM-313": {
+      "room": "RM-310",
+      "slot": 2
+    },
+    "OWS-101": {
+      "room": "RM-100",
+      "slot": 0
+    },
+    "OWS-102": {
+      "room": "RM-100",
+      "slot": 1
+    },
+    "TO-101": {
+      "room": "RM-100",
+      "slot": 2
+    }
+  }
+}

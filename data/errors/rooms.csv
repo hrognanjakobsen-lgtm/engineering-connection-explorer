@@ -1,0 +1,5 @@
+room_id,name,area,grid_col,grid_row
+RM-100,Kontrollrom,Driftsbygg 1. etg,1,1
+RM-110,Hovedteknisk rom (MER),Driftsbygg U1,1,0
+RM-210,Teknisk rom Nord,Stasjonsområde Nord,0,0
+RM-310,Teknisk rom Sør,Stasjonsområde Sør,2,0

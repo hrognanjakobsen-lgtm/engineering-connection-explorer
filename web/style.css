@@ -1,0 +1,90 @@
+:root {
+  --ink: #1F2933; --muted: #616E7C; --line: #9AA5B1; --frame: #CBD2D9; --room: #FAFBFC; --cab: #F3F5F7;
+  --copper: #3E4C59; --fiber: #0B6BCB; --accent: #0B6BCB; --hl: #E8590C; --err: #C62828; --warn: #B26A00; --ok: #2E7D32;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; font: 13px/1.4 "Segoe UI", Helvetica, Arial, sans-serif; color: var(--ink); background: #fff; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 16px; border-bottom: 1px solid var(--frame); flex-wrap: wrap; }
+.brand b { font-size: 15px; margin-right: 12px; }
+.brand span { color: var(--muted); }
+.controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.controls label { color: var(--muted); font-size: 12px; display: flex; gap: 6px; align-items: center; }
+select, button, .dl { font: inherit; border: 1px solid var(--frame); background: #fff; padding: 4px 8px; border-radius: 2px; color: var(--ink); text-decoration: none; cursor: pointer; }
+button:hover, .dl:hover { border-color: var(--line); }
+main { display: grid; grid-template-columns: 1fr 370px; height: calc(100% - 54px); }
+.canvas { position: relative; display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--frame); }
+.status { padding: 6px 16px; font-size: 12px; color: var(--muted); border-bottom: 1px solid #EEF1F4; min-height: 29px; }
+.status .pill { display: inline-block; padding: 0 6px; border: 1px solid var(--frame); margin-right: 6px; border-radius: 2px; }
+.status .pill.err { color: var(--err); border-color: #F1B5B5; }
+.status .pill.warn { color: var(--warn); border-color: #F0D29B; }
+.status .pill.ok { color: var(--ok); border-color: #B7DDB9; }
+.svgwrap { flex: 1; overflow: auto; }
+.svgwrap svg { display: block; }
+.legend { padding: 6px 16px; border-top: 1px solid #EEF1F4; font-size: 11px; color: var(--muted); display: flex; gap: 18px; flex-wrap: wrap; }
+.legend i { display: inline-block; width: 26px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 6px; }
+aside { overflow: auto; }
+.panel { padding: 12px 16px; border-bottom: 1px solid var(--frame); }
+.panel:empty { display: none; }
+.panel h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+.panel h3 { font-size: 14px; margin: 0 0 2px; }
+.muted { color: var(--muted); }
+.kv { display: grid; grid-template-columns: 110px 1fr; gap: 2px 8px; margin: 8px 0; font-size: 12px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; }
+.missing { color: var(--warn); font-style: italic; }
+.tag { font-family: Consolas, "Courier New", monospace; font-size: 12px; }
+.chain { margin: 8px 0 12px; padding: 8px; border: 1px solid var(--frame); background: var(--room); font-size: 12px; }
+.chain .hop { display: flex; align-items: baseline; gap: 6px; }
+.chain .dev { font-weight: 600; }
+.chain .port { font-family: Consolas, monospace; border: 1px solid var(--line); padding: 0 4px; background: #fff; font-size: 11px; }
+.chain .conn { margin: 1px 0 1px 18px; padding-left: 10px; border-left: 2px solid var(--copper); color: var(--muted); font-size: 11px; }
+.chain .conn.fiber { border-left-color: var(--fiber); }
+.chain .conn.internal, .chain .conn.through { border-left: 2px dotted var(--line); }
+.chain .end-open { color: var(--warn); }
+.chain .end-unknown { color: var(--err); }
+ul.list { list-style: none; padding: 0; margin: 0; }
+ul.list li { padding: 5px 6px; border-bottom: 1px solid #EEF1F4; cursor: pointer; font-size: 12px; }
+ul.list li:hover { background: #F5F7FA; }
+ul.list li.sel { background: #FFF4EC; }
+.sev { display: inline-block; min-width: 64px; font-size: 10px; font-weight: 700; letter-spacing: .03em; }
+.sev.error { color: var(--err); } .sev.warning { color: var(--warn); } .sev.info { color: var(--muted); }
+.chg { display: inline-block; min-width: 64px; font-size: 10px; font-weight: 700; }
+.chg.added { color: var(--ok); } .chg.removed { color: var(--err); } .chg.changed { color: var(--warn); }
+.src { color: var(--muted); font-size: 11px; }
+.btn-sim { margin-top: 4px; font-size: 12px; }
+.impact { margin-top: 8px; padding: 8px; border: 1px solid #F1B5B5; background: #FFF8F8; font-size: 12px; }
+.note { font-size: 11px; color: var(--muted); margin-top: 6px; }
+/* SVG */
+.room rect.frame { fill: var(--room); stroke: var(--frame); }
+.room.orphan rect.frame { stroke: var(--err); stroke-dasharray: 5 4; }
+.room text.t { font-weight: 600; font-size: 13px; fill: var(--ink); }
+.room.orphan text.t { fill: var(--err); }
+.room text.s { font-size: 11px; fill: var(--muted); }
+.cab rect { fill: var(--cab); stroke: var(--frame); }
+.cab text { font-size: 10px; font-weight: 600; fill: var(--muted); }
+.node { cursor: pointer; }
+.node rect.box { fill: #fff; stroke: var(--frame); }
+.node:hover rect.box { stroke: var(--line); }
+.node text.tag { font-size: 12px; font-weight: 700; fill: var(--ink); }
+.node text.desc { font-size: 10px; fill: var(--muted); }
+.node.problem rect.box, .node.placeholder rect.box { stroke: var(--err); stroke-dasharray: 4 3; }
+.node.placeholder text.desc, .node.problem text.desc { fill: var(--err); }
+.node.sel rect.box { stroke: var(--hl); stroke-width: 2; }
+.node.onpath rect.box { stroke: var(--hl); stroke-width: 1.5; }
+.edge { fill: none; cursor: pointer; }
+.edge .hit { stroke: transparent; stroke-width: 10; fill: none; }
+.edge .ln { stroke: var(--copper); stroke-width: 1.3; fill: none; }
+.edge.fiber .ln { stroke: var(--fiber); stroke-width: 2.2; }
+.edge.patch .ln { stroke-dasharray: 5 3; }
+.edge.bad .ln { stroke: var(--err); stroke-dasharray: 4 3; }
+.edge.onpath .ln { stroke: var(--hl); stroke-width: 3; }
+.edge.broken .ln { stroke: var(--err); stroke-width: 3; stroke-dasharray: 2 3; }
+.elabel { font-size: 10px; fill: var(--muted); pointer-events: none; }
+.elabel-bg { fill: #fff; }
+.dim { opacity: .18; }
+.diff-added rect.box, .edge.diff-added .ln { stroke: var(--ok) !important; stroke-width: 2.5; }
+.diff-changed rect.box, .edge.diff-changed .ln { stroke: var(--warn) !important; stroke-width: 2.5; }
+.ghost rect.box { fill: none; stroke: var(--err); stroke-dasharray: 3 3; }
+.ghost text { fill: var(--err); font-size: 11px; }
+.edge.ghost .ln { stroke: var(--err); stroke-dasharray: 3 3; stroke-width: 1.5; opacity: .8; }
+.badge { font-size: 10px; font-weight: 700; }

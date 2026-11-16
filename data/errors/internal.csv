@@ -1,0 +1,17 @@
+tag,port_a,port_b,note
+TO-101,F01,R01,Panelgjennomføring
+TO-101,F02,R02,Panelgjennomføring
+CPP-110-01,F01,R01,Panelgjennomføring
+CPP-110-01,F02,R02,Panelgjennomføring
+FPP-110-01,F01,R01,Skjøtekassett 1
+FPP-110-01,F02,R02,Skjøtekassett 1
+CPP-210-01,F01,R01,Panelgjennomføring
+CPP-210-01,F02,R02,Panelgjennomføring
+CPP-210-01,F03,R03,Panelgjennomføring
+CPP-210-01,F04,R04,Panelgjennomføring
+FPP-210-01,F01,R01,Skjøtekassett 1
+CPP-310-01,F01,R01,Panelgjennomføring
+CPP-310-01,F02,R02,Panelgjennomføring
+CPP-310-01,F03,R03,Panelgjennomføring
+FPP-310-01,F01,R01,Skjøtekassett 1
+CPP-210-01,F05,R05,Panelgjennomføring
