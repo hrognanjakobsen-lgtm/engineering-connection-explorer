@@ -7,7 +7,16 @@
 
 /* ------------------------------------------------------------------ CSV */
 
-function parseCSV(text, fileName) {
+function detectDelimiter(text) {
+  const first = String(text).replace(/^\uFEFF/, '').split(/\r?\n/).find(l => l.trim() !== '') || '';
+  let inQ = false; const n = { ',': 0, ';': 0, '\t': 0 };
+  for (const c of first) { if (c === '"') inQ = !inQ; else if (!inQ && n[c] != null) n[c]++; }
+  const best = Object.keys(n).sort((a, b) => n[b] - n[a])[0];
+  return n[best] > 0 ? best : ',';
+}
+
+function parseCSV(text, fileName, delimiter) {
+  const delim = delimiter || detectDelimiter(text);
   const rows = [];
   let i = 0, field = '', row = [], inQ = false, line = 1, rowLine = 1;
   text = String(text).replace(/^﻿/, '');
@@ -19,7 +28,7 @@ function parseCSV(text, fileName) {
       if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
       else { if (c === '\n') line++; field += c; }
     } else if (c === '"') inQ = true;
-    else if (c === ',') pushField();
+    else if (c === delim) pushField();
     else if (c === '\r') { /* ignorer */ }
     else if (c === '\n') { pushField(); pushRow(); line++; rowLine = line; }
     else field += c;
@@ -80,7 +89,7 @@ const pk = (tag, port) => tag + '|' + port;
 
 function buildModel(raw, opts) {
   opts = opts || {};
-  const issues = [];
+  const issues = (opts.preIssues || []).slice();
   const src = r => r && r.__src ? r.__src : null;
   const issue = (severity, code, message, refs, row) =>
     issues.push({ severity, code, message, refs: refs || [], source: src(row) });
@@ -90,7 +99,7 @@ function buildModel(raw, opts) {
   for (const r of raw.rooms) {
     if (!r.room_id) { issue('error', 'MISSING_ID', 'Rom uten room_id', [], r); continue; }
     if (rooms.has(r.room_id)) { issue('error', 'DUPLICATE_ID', `Rom ${r.room_id} er registrert flere ganger`, [r.room_id], r); continue; }
-    rooms.set(r.room_id, { id: r.room_id, name: r.name, area: r.area, col: +r.grid_col || 0, row: +r.grid_row || 0, src: src(r) });
+    rooms.set(r.room_id, { id: r.room_id, name: r.name, area: r.area, col: r.grid_col === '' || r.grid_col == null || isNaN(+r.grid_col) ? null : +r.grid_col, row: r.grid_row === '' || r.grid_row == null || isNaN(+r.grid_row) ? null : +r.grid_row, src: src(r) });
   }
   for (const r of raw.cabinets) {
     if (cabinets.has(r.cabinet_id)) { issue('error', 'DUPLICATE_ID', `Kabinett ${r.cabinet_id} er registrert flere ganger`, [r.cabinet_id], r); continue; }
@@ -116,9 +125,20 @@ function buildModel(raw, opts) {
       else if (e.room && c.room !== e.room) { issue('error', 'CABINET_ROOM_MISMATCH', `${tag} står i ${e.cabinet} (rom ${c.room}), men er registrert i rom ${e.room}`, [tag], r); e.problems.push('Kabinett/rom stemmer ikke'); }
     }
     if (!e.system) issue('warning', 'MISSING_SYSTEM', `${tag} mangler system`, [tag], r);
-    if (!e.ports.length) issue('warning', 'MISSING_PORTS', `${tag} har ingen porter registrert`, [tag], r);
     equipment.set(tag, e);
   }
+
+  /* --- porter: valgfritt utledet fra kabler/patcher/interne når eksporten mangler portliste (alltid synlig som INFO) */
+  for (const e of equipment.values()) {
+    if (e.ports.length || !opts.derivePorts) continue;
+    const ps = new Set();
+    raw.cables.concat(raw.patching).forEach(r => { if (r.from_tag === e.tag && r.from_port) ps.add(r.from_port); if (r.to_tag === e.tag && r.to_port) ps.add(r.to_port); });
+    raw.internal.forEach(r => { if (r.tag === e.tag) { if (r.port_a) ps.add(r.port_a); if (r.port_b) ps.add(r.port_b); } });
+    e.ports = Array.from(ps).sort((a, b) => a.localeCompare(b, 'nb', { numeric: true }));
+    e.portsDerived = true;
+    if (e.ports.length) issue('info', 'PORTS_DERIVED', `${e.tag}: portliste mangler i kilden – utledet fra registrerte kabler (${e.ports.length} porter)`, [e.tag], e.src ? { __src: e.src } : null);
+  }
+  for (const e of equipment.values()) if (!e.ports.length) issue('warning', 'MISSING_PORTS', `${e.tag} har ingen porter registrert`, [e.tag], e.src ? { __src: e.src } : null);
 
   /* --- kabler og patcher: samme struktur, ulik kategori */
   const links = [];
@@ -416,7 +436,14 @@ const L = {
 function layoutModel(model, lockIn) {
   const lock = JSON.parse(JSON.stringify(lockIn || { slots: {} }));
   lock.slots = lock.slots || {};
-  const roomList = Array.from(model.rooms.values()).sort((a, b) => a.row - b.row || a.col - b.col || a.id.localeCompare(b.id));
+  // rom uten grid_col/grid_row får første ledige plass (3 per rad), sortert på ID – deterministisk
+  const roomsAll = Array.from(model.rooms.values()).map(r => Object.assign({}, r));
+  const usedCells = new Set(roomsAll.filter(r => r.col != null && r.row != null).map(r => r.col + ',' + r.row));
+  roomsAll.filter(r => r.col == null || r.row == null).sort((a, b) => a.id.localeCompare(b.id)).forEach(r => {
+    let k = 0; while (usedCells.has((k % 3) + ',' + Math.floor(k / 3))) k++;
+    r.col = k % 3; r.row = Math.floor(k / 3); usedCells.add(r.col + ',' + r.row);
+  });
+  const roomList = roomsAll.sort((a, b) => a.row - b.row || a.col - b.col || a.id.localeCompare(b.id));
   const byRoom = new Map(roomList.map(r => [r.id, { cabs: [], field: [] }]));
   const ORPHAN = '__ORPHAN__';
   byRoom.set(ORPHAN, { cabs: [], field: [] });
@@ -520,8 +547,8 @@ function layoutModel(model, lockIn) {
     const ow = free != null ? colW[free] : roomInfo.get(ORPHAN).w;
     placeRoom(ORPHAN, ox, oy, ow, roomInfo.get(ORPHAN).h, 'Uten gyldig rom / ukjent', 'Mangler eller ugyldig plassering i datasettet', true);
   }
-  out.width = Math.max.apply(null, out.rooms.map(r => r.x + r.w)) + L.margin;
-  out.height = Math.max.apply(null, out.rooms.map(r => r.y + r.h)) + L.margin;
+  out.width = Math.max.apply(null, [400].concat(out.rooms.map(r => r.x + r.w))) + L.margin;
+  out.height = Math.max.apply(null, [200].concat(out.rooms.map(r => r.y + r.h))) + L.margin;
 
   /* --- kanter: én kant per enhetspar (aggregert), rutet med A* */
   const pairs = new Map();
@@ -920,6 +947,7 @@ function portRowsDiagram(model, rows, opts) {
 
 function page2Room(model, roomId) {
   const room = model.rooms.get(roomId);
+  if (!room) return { cells: [cell('p2title', '<b>Romdetalj</b><br><font color="' + COLORS.error + '">Ingen gyldige rom i datasettet – se avvikslisten.</font>', 'text;html=1;align=left;verticalAlign=top;fontSize=14;', '1', { x: 40, y: 10, w: 900, h: 40 })], w: 1000, h: 200 };
   const inRoom = t => { const e = model.equipment.get(t); return e && e.room === roomId; };
   const chs = model.channels.filter(ch => ch.tags.some(inRoom));
   // kolonner: endeutstyr | kobberpanel | svitsj | fiberpanel | fjernende (annet rom)
@@ -953,8 +981,12 @@ function page2Room(model, roomId) {
 }
 
 function page3Route(model, logicalId) {
-  const lg = model.logical.find(l => l.id === logicalId);
+  let lg = model.logical.find(l => l.id === logicalId);
   const cells = [];
+  if (!lg) {
+    const ch = model.channels.filter(c => c.complete).sort((a, b) => b.nodes.length - a.nodes.length || a.id.localeCompare(b.id))[0];
+    if (ch) lg = { id: ch.id, from: ch.ends[0].tag, to: ch.ends[1].tag, service: 'lengste registrerte kanal', route: [{ channel: ch.id, reversed: false }] };
+  }
   if (!lg || !lg.route) {
     cells.push(cell('p3t', `<b>Forbindelsessti ${xmlEsc(logicalId)}</b><br><font color="${COLORS.error}">Ingen registrert fysisk kjede funnet.</font>`, 'text;html=1;align=left;verticalAlign=top;fontSize=14;', '1', { x: 40, y: 10, w: 900, h: 40 }));
     return { cells, w: 1000, h: 200 };
@@ -990,8 +1022,8 @@ function buildDrawio(model, layout, opts) {
   opts = opts || {};
   const pages = [
     { name: '1 Totaloversikt', p: page1Overview(model, layout) },
-    { name: '2 Rom ' + opts.roomId, p: page2Room(model, opts.roomId) },
-    { name: '3 Sti ' + opts.logicalId, p: page3Route(model, opts.logicalId) }
+    { name: '2 Rom ' + (opts.roomId || ''), p: page2Room(model, opts.roomId) },
+    { name: '3 Sti ' + (opts.logicalId || ''), p: page3Route(model, opts.logicalId) }
   ];
   const diag = pages.map((pg, i) =>
     `<diagram id="ece-page-${i + 1}" name="${xmlEsc(pg.name)}"><mxGraphModel dx="1400" dy="900" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="${Math.ceil(pg.p.w + 40)}" pageHeight="${Math.ceil(pg.p.h + 40)}" math="0" shadow="0" background="#FFFFFF"><root><mxCell id="0"/><mxCell id="1" parent="0"/>${pg.p.cells.join('')}</root></mxGraphModel></diagram>`
@@ -1090,17 +1122,305 @@ function utf8ToBase64(str) {
   return out;
 }
 
+/* ======================================================== IMPORT */
+/*
+ * Import av egne eksporter (f.eks. fra PATCH MANAGER) via en konfigurerbar kolonnemapping.
+ * Mappingen er data (JSON), ikke kode: den sier hvilken kildetabell og hvilke kolonner
+ * som gir hvert felt i den kanoniske modellen. Ingenting gjettes – manglende tabeller og
+ * kolonner rapporteres som avvik.
+ */
+
+const FIELDS = {
+  rooms:         { fields: ['room_id', 'name', 'area', 'grid_col', 'grid_row'], required: ['room_id'] },
+  cabinets:      { fields: ['cabinet_id', 'room_id', 'name', 'height_u'], required: ['cabinet_id', 'room_id'] },
+  equipment:     { fields: ['tag', 'description', 'type', 'system', 'room_id', 'cabinet_id', 'rack_u', 'ports', 'model'], required: ['tag', 'type'] },
+  cables:        { fields: ['cable_tag', 'from_tag', 'from_port', 'to_tag', 'to_port', 'cable_type', 'length_m'], required: ['cable_tag', 'from_tag', 'from_port', 'to_tag', 'to_port'] },
+  patching:      { fields: ['patch_tag', 'from_tag', 'from_port', 'to_tag', 'to_port', 'cable_type', 'length_m'], required: ['patch_tag', 'from_tag', 'from_port', 'to_tag', 'to_port'] },
+  internal:      { fields: ['tag', 'port_a', 'port_b', 'note'], required: ['tag', 'port_a', 'port_b'] },
+  logical_links: { fields: ['link_id', 'from_tag', 'to_tag', 'service', 'note'], required: ['link_id', 'from_tag', 'to_tag'] }
+};
+const REQUIRED_TABLES = ['rooms', 'equipment'];
+
+/** Standardmapping: kanoniske tabell- og kolonnenavn (som data/base/*.csv) */
+const DEFAULT_MAPPING = { name: 'Standard (kanoniske CSV-/arknavn)', tables: {} };
+FILES.forEach(t => { DEFAULT_MAPPING.tables[t] = { source: t }; });
+
+const normName = s => String(s == null ? '' : s).trim().toLowerCase().replace(/\.(csv|txt|tsv|xlsx|xlsm)$/, '');
+const normCol = s => String(s == null ? '' : s).replace(/^﻿/, '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+/**
+ * tables: { kildenavn: [rad-objekter] } (fra CSV-filer eller Excel-ark)
+ * mapping: { name, derivePorts?, tables: { mål: { source, where?, columns? } } }
+ * Kolonnespesifikasjon: "Kolonne" | ["Alt1","Alt2"] | { column, map, number, format, split:{sep,index}, const, default }
+ */
+function importTables(tables, mapping) {
+  mapping = mapping || DEFAULT_MAPPING;
+  const issues = [], used = [];
+  const add = (severity, code, message, refs) => issues.push({ severity, code, message, refs: refs || [], source: null });
+  const byName = new Map();
+  Object.keys(tables).forEach(k => byName.set(normName(k), { name: k, rows: tables[k] || [] }));
+  const raw = {};
+  for (const target of FILES) {
+    raw[target] = [];
+    const spec = (mapping.tables || {})[target];
+    if (!spec) continue;
+    const sources = [].concat(spec.source || target);
+    const t = sources.map(normName).map(n => byName.get(n)).find(Boolean);
+    if (!t) {
+      if (!spec.optional) add(REQUIRED_TABLES.indexOf(target) >= 0 ? 'error' : 'warning', 'MAPPING_TABLE',
+        `Fant ikke kildetabell ${sources.map(x => '«' + x + '»').join(' / ')} for ${target}. Tilgjengelige: ${Array.from(byName.values()).map(x => x.name).join(', ') || '(ingen)'}`, [target]);
+      continue;
+    }
+    const header = new Map();
+    t.rows.forEach(r => Object.keys(r).forEach(k => { if (!header.has(normCol(k))) header.set(normCol(k), k); }));
+    const reported = new Set();
+    const colKey = (names, field, mandatory) => {
+      for (const n of [].concat(names)) if (header.has(normCol(n))) return header.get(normCol(n));
+      if (mandatory && !reported.has(field)) {
+        reported.add(field);
+        add('error', 'MAPPING_COLUMN', `${t.name}: mangler kolonne ${[].concat(names).map(x => '«' + x + '»').join(' / ')} for ${target}.${field}. Kolonner i kilden: ${Array.from(header.values()).join(', ')}`, [target, field]);
+      }
+      return null;
+    };
+    // filter (f.eks. kabler vs. patcher i samme tabell)
+    let rows = t.rows;
+    if (spec.where) {
+      const wk = colKey(spec.where.column, 'where', true);
+      const vals = [].concat(spec.where.in || spec.where.equals || []).map(normCol);
+      const not = [].concat(spec.where.notIn || spec.where.notEquals || []).map(normCol);
+      rows = wk == null ? [] : rows.filter(r => { const v = normCol(r[wk]); return (!vals.length || vals.indexOf(v) >= 0) && not.indexOf(v) < 0; });
+    }
+    const fieldSpecs = FIELDS[target].fields.map(f => {
+      const cs = spec.columns ? spec.columns[f] : f;
+      const mandatory = spec.columns ? cs != null && !(typeof cs === 'object' && !Array.isArray(cs) && ('const' in cs)) : FIELDS[target].required.indexOf(f) >= 0;
+      if (cs == null) return { f, get: () => '' };
+      const o = typeof cs === 'string' || Array.isArray(cs) ? { column: cs } : cs;
+      if ('const' in o) return { f, get: () => String(o.const) };
+      const key = colKey(o.column || f, f, mandatory || (spec.columns && FIELDS[target].required.indexOf(f) >= 0));
+      const mapLower = o.map ? new Map(Object.keys(o.map).map(k => [normCol(k), o.map[k]])) : null;
+      return { f, get: r => {
+        let v = key == null ? '' : String(r[key] == null ? '' : r[key]).trim();
+        if (v === '' && o.default != null) v = String(o.default);
+        if (o.split && v) { const parts = v.split(o.split.sep); v = (parts[o.split.index || 0] || '').trim(); }
+        if (mapLower && v !== '' && mapLower.has(normCol(v))) v = String(mapLower.get(normCol(v)));
+        if (o.number && v !== '') v = v.replace(/\s/g, '').replace(',', '.');
+        if (o.format && v !== '') v = o.format.replace(/\{value\}/g, v);
+        return v;
+      } };
+    });
+    raw[target] = rows.map(r => {
+      const o = {};
+      fieldSpecs.forEach(fs => { o[fs.f] = fs.get(r); });
+      Object.defineProperty(o, '__src', { value: r.__src || { file: t.name, line: 0 }, enumerable: false });
+      return o;
+    });
+    used.push({ target, source: t.name, rows: raw[target].length, of: t.rows.length });
+  }
+  return { raw, issues, used, derivePorts: !!mapping.derivePorts };
+}
+
+/** Kjør fra importerte tabeller: mapping -> modell -> layout -> drawio/rapport */
+function runImport(tables, mapping, opts) {
+  const imp = importTables(tables, mapping);
+  const r = runModel(imp.raw, Object.assign({}, opts, { preIssues: imp.issues, derivePorts: imp.derivePorts }));
+  r.import = imp;
+  return r;
+}
+
+/** Tekst fra filbytes: UTF-8 (med/uten BOM), ellers Windows-1252 (eldre norsk Excel-CSV) */
+function decodeText(bytes) {
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes).replace(/^﻿/, ''); }
+  catch (e) { return new TextDecoder('windows-1252').decode(bytes); }
+}
+
+/* ------------------------------------------------- ZIP og XLSX */
+
+function crc32(buf) {
+  let crc = 0xffffffff;
+  for (let i = 0; i < buf.length; i++) { let c = (crc ^ buf[i]) & 0xff; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; crc = (crc >>> 8) ^ c; }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+const utf8 = s => new TextEncoder().encode(s);
+
+/** Lager ZIP (lagret, ukomprimert). entries: [[navn, tekst|Uint8Array]] -> Uint8Array */
+function makeZip(entries) {
+  const chunks = [], central = []; let off = 0;
+  const u16 = (a, o, v) => { a[o] = v & 255; a[o + 1] = (v >>> 8) & 255; };
+  const u32 = (a, o, v) => { u16(a, o, v & 0xffff); u16(a, o + 2, (v >>> 16) & 0xffff); };
+  for (const [name, content] of entries) {
+    const data = typeof content === 'string' ? utf8(content) : content, fn = utf8(name), crc = crc32(data);
+    const h = new Uint8Array(30);
+    u32(h, 0, 0x04034b50); u16(h, 4, 20); u16(h, 6, 0x0800); u16(h, 12, 0x5a21); u32(h, 14, crc); u32(h, 18, data.length); u32(h, 22, data.length); u16(h, 26, fn.length);
+    chunks.push(h, fn, data);
+    const c = new Uint8Array(46);
+    u32(c, 0, 0x02014b50); u16(c, 4, 20); u16(c, 6, 20); u16(c, 8, 0x0800); u16(c, 14, 0x5a21); u32(c, 16, crc); u32(c, 20, data.length); u32(c, 24, data.length); u16(c, 28, fn.length); u32(c, 42, off);
+    central.push(c, fn); off += 30 + fn.length + data.length;
+  }
+  const cdLen = central.reduce((s, x) => s + x.length, 0);
+  const e = new Uint8Array(22);
+  u32(e, 0, 0x06054b50); u16(e, 8, entries.length); u16(e, 10, entries.length); u32(e, 12, cdLen); u32(e, 16, off);
+  const all = chunks.concat(central, [e]);
+  const out = new Uint8Array(all.reduce((s, x) => s + x.length, 0));
+  let p = 0; all.forEach(x => { out.set(x, p); p += x.length; });
+  return out;
+}
+
+/** Leser ZIP-innhold. inflateRaw: (Uint8Array) => Promise<Uint8Array> (DecompressionStream i nettleser, zlib i Node) */
+async function readZip(bytes, inflateRaw) {
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let e = bytes.length - 22;
+  while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
+  if (e < 0) throw new Error('Filen er ikke en gyldig .xlsx/zip');
+  const n = dv.getUint16(e + 10, true);
+  let p = dv.getUint32(e + 16, true);
+  const files = new Map();
+  for (let i = 0; i < n; i++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) throw new Error('Ødelagt zip-katalog');
+    const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true);
+    const nlen = dv.getUint16(p + 28, true), xlen = dv.getUint16(p + 30, true), clen = dv.getUint16(p + 32, true), lho = dv.getUint32(p + 42, true);
+    const name = new TextDecoder().decode(bytes.subarray(p + 46, p + 46 + nlen));
+    const start = lho + 30 + dv.getUint16(lho + 26, true) + dv.getUint16(lho + 28, true);
+    files.set(name, { method, data: bytes.subarray(start, start + csize) });
+    p += 46 + nlen + xlen + clen;
+  }
+  return {
+    names: Array.from(files.keys()),
+    text: async name => {
+      const f = files.get(name);
+      if (!f) return null;
+      if (f.method === 0) return new TextDecoder().decode(f.data);
+      if (f.method === 8) return new TextDecoder().decode(await inflateRaw(f.data));
+      throw new Error('Ukjent komprimering i ' + name);
+    }
+  };
+}
+
+const xmlUnesc = s => String(s).replace(/&(lt|gt|amp|quot|apos|#\d+|#x[0-9a-f]+);/gi, (m, g) =>
+  g[0] === '#' ? String.fromCodePoint(g[1] === 'x' || g[1] === 'X' ? parseInt(g.slice(2), 16) : +g.slice(1)) : { lt: '<', gt: '>', amp: '&', quot: '"', apos: "'" }[g.toLowerCase()]);
+const attr = (tag, name) => { const m = tag.match(new RegExp('\\s' + name + '="([^"]*)"')); return m ? xmlUnesc(m[1]) : null; };
+const colIndex = ref => { const m = /^([A-Z]+)/.exec(ref || ''); let n = 0; if (m) for (const ch of m[1]) n = n * 26 + ch.charCodeAt(0) - 64; return n - 1; };
+
+/** Leser .xlsx -> { arknavn: [rad-objekter] } (første rad = kolonneoverskrifter). Ingen avhengigheter. */
+async function readXlsx(bytes, inflateRaw) {
+  const z = await readZip(bytes, inflateRaw);
+  const wb = await z.text('xl/workbook.xml');
+  if (!wb) throw new Error('Mangler xl/workbook.xml – er dette en Excel-fil (.xlsx)?');
+  const rels = (await z.text('xl/_rels/workbook.xml.rels')) || '';
+  const relMap = new Map((rels.match(/<Relationship\b[^>]*>/g) || []).map(t => [attr(t, 'Id'), attr(t, 'Target')]));
+  const ssXml = (await z.text('xl/sharedStrings.xml')) || '';
+  const shared = (ssXml.match(/<si>[\s\S]*?<\/si>/g) || []).map(si => (si.replace(/<rPh\b[\s\S]*?<\/rPh>/g, '').match(/<t\b[^>]*>[\s\S]*?<\/t>|<t\b[^>]*\/>/g) || []).map(t => xmlUnesc(t.replace(/<t\b[^>]*\/>|<t\b[^>]*>|<\/t>/g, ''))).join(''));
+  const out = {};
+  for (const sh of wb.match(/<sheet\b[^>]*>/g) || []) {
+    const name = attr(sh, 'name'), target = relMap.get(attr(sh, 'r:id'));
+    if (!target) continue;
+    const path = target.charAt(0) === '/' ? target.slice(1) : 'xl/' + target.replace(/^\.\//, '');
+    const xml = await z.text(path);
+    if (!xml) continue;
+    const grid = [];
+    let rowNo = 0;
+    for (const rm of xml.match(/<row\b[^>]*?(?:\/>|>[\s\S]*?<\/row>)/g) || []) {
+      const rAttr = attr(rm.match(/<row\b[^>]*>/)[0], 'r');
+      rowNo = rAttr ? +rAttr : rowNo + 1;
+      const cells = [];
+      let ci = -1;
+      for (const cm of rm.match(/<c\b[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g) || []) {
+        const open = cm.match(/<c\b[^>]*?\/?>/)[0];
+        const ref = attr(open, 'r');
+        ci = ref ? colIndex(ref) : ci + 1;
+        const t = attr(open, 't');
+        let v = '';
+        if (t === 'inlineStr') v = ((cm.match(/<t\b[^>]*>([\s\S]*?)<\/t>/g) || []).map(x => xmlUnesc(x.replace(/<t\b[^>]*>|<\/t>/g, '')))).join('');
+        else {
+          const vm = cm.match(/<v>([\s\S]*?)<\/v>/);
+          v = vm ? xmlUnesc(vm[1]) : '';
+          if (t === 's') v = shared[+v] || '';
+          else if (t === 'b') v = v === '1' ? 'TRUE' : 'FALSE';
+          else if ((!t || t === 'n') && v !== '' && !isNaN(+v)) v = String(+(+v).toPrecision(12));
+        }
+        cells[ci] = v;
+      }
+      grid.push({ line: rowNo, cells });
+    }
+    const nonEmpty = grid.filter(r => r.cells.some(c => c != null && String(c).trim() !== ''));
+    if (!nonEmpty.length) { out[name] = []; continue; }
+    const head = nonEmpty[0].cells.map(h => (h == null ? '' : String(h)).trim());
+    out[name] = nonEmpty.slice(1).map(r => {
+      const o = {};
+      head.forEach((h, k) => { if (h) o[h] = r.cells[k] == null ? '' : String(r.cells[k]).trim(); });
+      Object.defineProperty(o, '__src', { value: { file: name, line: r.line }, enumerable: false });
+      return o;
+    });
+  }
+  return out;
+}
+
+/** Skriver enkel .xlsx (tekstceller) fra { arknavn: [[celle, ...], ...] } -> Uint8Array */
+function writeXlsx(sheets) {
+  const names = Object.keys(sheets);
+  const colName = i => { let s = ''; i++; while (i) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };
+  const NS = 'http://schemas.openxmlformats.org';
+  const files = [
+    ['[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="${NS}/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>` +
+      names.map((n, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('') + '</Types>'],
+    ['_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="${NS}/package/2006/relationships"><Relationship Id="rId1" Type="${NS}/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
+    ['xl/workbook.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="${NS}/spreadsheetml/2006/main" xmlns:r="${NS}/officeDocument/2006/relationships"><sheets>` +
+      names.map((n, i) => `<sheet name="${xmlEsc(n.slice(0, 31))}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('') + '</sheets></workbook>'],
+    ['xl/_rels/workbook.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="${NS}/package/2006/relationships">` +
+      names.map((n, i) => `<Relationship Id="rId${i + 1}" Type="${NS}/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('') + '</Relationships>']
+  ];
+  names.forEach((n, i) => {
+    const rows = sheets[n].map((r, ri) => `<row r="${ri + 1}">` + r.map((v, ci) => v == null || v === '' ? '' :
+      `<c r="${colName(ci)}${ri + 1}" t="inlineStr"><is><t xml:space="preserve">${xmlEsc(v)}</t></is></c>`).join('') + '</row>').join('');
+    files.push([`xl/worksheets/sheet${i + 1}.xml`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="${NS}/spreadsheetml/2006/main"><sheetData>${rows}</sheetData></worksheet>`]);
+  });
+  return makeZip(files);
+}
+
+/** Excel-mal med kanoniske ark og kolonner (valgfritt med eksempelrader fra et datasett) */
+function buildTemplateXlsx(raw) {
+  const sheets = {};
+  FILES.forEach(t => { sheets[t] = [FIELDS[t].fields].concat(raw ? raw[t].map(r => FIELDS[t].fields.map(f => r[f] == null ? '' : r[f])) : []); });
+  return writeXlsx(sheets);
+}
+
+/** Kabelliste som CSV */
+function buildCableCsv(model) {
+  const q = v => /[",\n;]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v);
+  const rows = [['tag', 'kategori', 'fra_tag', 'fra_port', 'fra_rom', 'til_tag', 'til_port', 'til_rom', 'type', 'lengde_m', 'status']];
+  model.links.slice().sort((a, b) => a.id.localeCompare(b.id)).forEach(l => {
+    const ra = model.equipment.get(l.a.tag), rb = model.equipment.get(l.b.tag);
+    rows.push([l.id, l.kind === 'cable' ? 'kabel' : 'patch', l.a.tag, l.a.port, ra ? ra.room : '', l.b.tag, l.b.port, rb ? rb.room : '', l.cableType, l.length == null ? '' : l.length, l.problems.join('; ') || 'OK']);
+  });
+  return rows.map(r => r.map(q).join(',')).join('\n') + '\n';
+}
+
 /* ============================================ HELHETLIG KJØRING */
 
 /** Kjør hele kjeden for ett datasett: CSV-tekster -> modell, layout, drawio, rapport */
 function runPipeline(files, opts) {
+  return runModel(parseDataset(files), opts);
+}
+
+/** Felles kjøring fra rå tabeller (brukes av CLI, nettleserimport og n8n) */
+function runModel(raw, opts) {
   opts = opts || {};
-  const raw = parseDataset(files);
-  const model = buildModel(raw);
+  const model = buildModel(raw, { preIssues: opts.preIssues, derivePorts: opts.derivePorts });
   const { layout, lock } = layoutModel(model, opts.lock);
-  const drawio = buildDrawio(model, layout, { roomId: opts.roomId || 'RM-210', logicalId: opts.logicalId || 'L-001' });
+  const pick = defaultSelections(model);
+  const roomId = opts.roomId && model.rooms.has(opts.roomId) ? opts.roomId : pick.roomId;
+  const logicalId = opts.logicalId && model.logical.some(l => l.id === opts.logicalId && l.route) ? opts.logicalId : pick.logicalId;
+  const drawio = buildDrawio(model, layout, { roomId, logicalId });
   const report = buildReport(model, { title: opts.title });
-  return { raw, model, layout, lock, drawio, report };
+  return { raw, model, layout, lock, drawio, report, roomId, logicalId };
+}
+
+/** Standard rom for side 2 (flest kanaler) og sti for side 3 (første logiske med fysisk kjede) */
+function defaultSelections(model) {
+  const count = new Map();
+  model.channels.forEach(c => c.tags.forEach(t => { const e = model.equipment.get(t); if (e && model.rooms.has(e.room)) count.set(e.room, (count.get(e.room) || 0) + 1); }));
+  const roomId = Array.from(count.keys()).sort((a, b) => count.get(b) - count.get(a) || a.localeCompare(b))[0] || (model.rooms.keys().next().value || '');
+  const lg = model.logical.find(l => l.route);
+  return { roomId, logicalId: lg ? lg.id : '' };
 }
 
 /** Serialiserbar visning av modellen (for nettleser/n8n) */
@@ -1120,7 +1440,8 @@ function modelToJSON(model) {
 
 const api = {
   parseCSV, parseDataset, expandPorts, buildModel, computeChannels, findRoute, routeHops, removalImpact,
-  diffModels, buildDiffReport, utf8ToBase64, channelText, layoutModel, buildDrawio, buildReport, runPipeline, modelToJSON, TYPES, FILES
+  diffModels, buildDiffReport, utf8ToBase64, channelText, layoutModel, buildDrawio, buildReport, runPipeline, runModel, modelToJSON, TYPES, FILES,
+  FIELDS, DEFAULT_MAPPING, importTables, runImport, decodeText, detectDelimiter, makeZip, readZip, readXlsx, writeXlsx, buildTemplateXlsx, buildCableCsv, defaultSelections
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 if (typeof window !== 'undefined') window.ECE = api;

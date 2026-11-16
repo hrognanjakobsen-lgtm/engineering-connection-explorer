@@ -9,6 +9,22 @@ automatisk kan bli blokkdiagrammer, redigerbare draw.io-tegninger og dokumentasj
 Åpne **`out/engineering-connection-explorer.html`** direkte i nettleseren. Én fil med visning, data og nedlastbare `.drawio`-filer og rapporter innebygd. Det trengs ingen installasjon eller server, og den gjør ingen nettverkskall.
 Filen lages av `npm run build` (`src/build-standalone.js`).
 
+## Importer egne data (PATCH MANAGER-eksport e.l.)
+
+Klikk **Importer data…** i visningen og dra inn CSV- eller Excel-filer.
+- **Ingenting forlater maskinen:** filene leses bare lokalt i nettleseren, og ingenting sendes noe sted. Det fungerer også i den frittstående HTML-filen.
+- **CSV:** komma, semikolon (norsk Excel) og tab gjenkjennes automatisk, og både UTF-8 og Windows-1252 leses.
+- **Excel (.xlsx):** leses uten tredjepartsbibliotek, med én tabell per ark.
+- **Kolonnemapping** (`mappings/*.json`) kobler kildens tabell- og kolonnenavn til den kanoniske modellen. Den støtter verdioversettelse (`map`), desimalkomma (`number`), `split`, `format`, konstanter og filtrering (`where`), for eksempel kabler og patcher i samme tabell.
+- **Avvik:** manglende tabeller og kolonner rapporteres som `MAPPING_*`-feil med liste over kolonnene som faktisk finnes.
+- **Prøv fiktivt eksempel** laster `data/import-eksempel/` med oppdiktede kolonnenavn, semikolon og desimalkomma, sammen med `mappings/eksempel-eksport.json`. Resultatet blir identisk med basisdatasettet.
+- **Last ned Excel-mal** gir et tomt regneark med de kanoniske arkene, som kan fylles ut for hånd. Malen finnes også i `data/mal/`.
+- **Resultat:** en zip med `.drawio`, rapport, kabelliste, mappingen og `layout-lock.json`.
+
+**Om eksempelformatet:** det er oppdiktet. Det faktiske formatet til PATCH MANAGER-eksporten må kartlegges, og mappingen tilpasses.
+Se `.github/copilot-instructions.md` for hvordan Copilot-agenten i VS Code skal gjøre det.
+**Ekte anleggsdata skal ikke legges i dette repoet.**
+
 ## Start
 
 Krever Node.js 18 eller nyere. Prosjektet har ingen avhengigheter, så `npm install` trengs ikke.
@@ -22,7 +38,7 @@ npm start
 | Kommando | Hva den gjør |
 |---|---|
 | `npm run build` | Genererer `out/` (modell, `.drawio`, rapporter, data til visningen og frittstående HTML) |
-| `npm test` | Bygger og kjører 41 automatiske kontroller |
+| `npm test` | Bygger og kjører 49 automatiske kontroller |
 | `npm run n8n` | Genererer n8n-workflowen i `n8n/` fra samme kjerne og data |
 
 `web/index.html` kan også åpnes direkte som fil etter `npm run build`.
@@ -34,9 +50,13 @@ data/base/      gyldig basisdatasett (4 rom, 3 kabinetter, 20 tagger)
 data/errors/    samme data med 3 bevisste feil
 data/rev-b/     revisjon B: CAM-214 flyttet, PC-110-002 flyttet til annen svitsjport
 data/layout-lock.json  låste plasseringer for utstyr utenfor kabinett (stabil layout)
-src/core.js     felles kjerne: CSV → datamodell → kontroller → stier → layout → draw.io/rapport/diff
+src/core.js     felles kjerne: import/mapping → datamodell → kontroller → stier → layout → draw.io/rapport/diff
 src/build.js    CLI-bygg til out/
-web/            nettleservisning (leser out/data.js)
+web/            nettleservisning (leser out/data.js) og importdialog
+mappings/       kolonnemappinger for import (JSON)
+data/import-eksempel/  fiktiv «fremmed» eksport (CSV + xlsx) for å vise mapping
+data/mal/       Excel-maler
+.github/copilot-instructions.md  regler og arkitektur for Copilot-agenter
 n8n/            importerbar n8n-workflow
 out/            genererte filer (.drawio, rapporter, kabelliste)
 docs/preview/   PNG-forhåndsvisninger (se merknad under)

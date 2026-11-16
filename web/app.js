@@ -306,6 +306,17 @@
   $('clear').onclick = () => { state.sel = null; state.sim = null; state.room = ''; state.sys = ''; $('roomFilter').value = ''; $('sysFilter').value = ''; update(); };
   $('svgwrap').addEventListener('click', () => { if (state.sel) { state.sel = null; state.sim = null; update(); } });
 
+  // brukes av import.js: legg til et nytt datasett og vis det
+  window.ECE_APP = {
+    addDataset: function (key, entry, impacts) {
+      D.datasets[key] = entry; D.impacts[key] = impacts;
+      const sel = $('dataset');
+      if (!Array.from(sel.options).some(o => o.value === key)) sel.insertAdjacentHTML('beforeend', `<option value="${esc(key)}">${esc(entry.title)}</option>`);
+      state.ds = key; sel.value = key; state.sel = null; state.sim = null; state.room = ''; state.sys = '';
+      load(); update();
+    }
+  };
+
   // dyplenke: ?ds=revb&sel=CAM-211
   const q = new URLSearchParams(location.search);
   if (q.get('ds') && D.datasets[q.get('ds')]) { state.ds = q.get('ds'); $('dataset').value = state.ds; }

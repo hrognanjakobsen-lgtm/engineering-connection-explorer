@@ -20,6 +20,7 @@
     <label>Rom <select id="roomFilter"><option value="">Alle rom</option></select></label>
     <label>System <select id="sysFilter"><option value="">Alle systemer</option></select></label>
     <button id="clear" type="button">Nullstill valg</button>
+    <button id="importBtn" type="button" class="primary">Importer data…</button>
     <a class="dl" href="../out/engineering-connections.drawio" download>Last ned .drawio</a>
   </div>
 </header>
@@ -36,7 +37,32 @@
     <div class="panel" id="issues"></div>
   </aside>
 </main>
+<div id="importDlg" class="modal" hidden>
+  <div class="dlg" role="dialog" aria-label="Importer egne data">
+    <h2>Importer egne data</h2>
+    <p class="muted">Filene leses bare lokalt i nettleseren. Ingenting lastes opp eller sendes noe sted.</p>
+    <div id="drop" class="drop">Dra inn CSV- eller Excel-filer (.csv, .xlsx) hit, eller <label class="linkbtn">velg filer<input type="file" id="files" multiple accept=".csv,.txt,.tsv,.xlsx,.xlsm" hidden></label></div>
+    <div id="impTables"></div>
+    <div class="maprow">
+      <label>Kolonnemapping <select id="mapSel"></select></label>
+      <button id="mapLoad" type="button">Åpne mappingfil…</button><input type="file" id="mapFile" accept=".json" hidden>
+      <button id="mapSave" type="button">Lagre mapping</button>
+    </div>
+    <textarea id="mapText" spellcheck="false" aria-label="Mapping (JSON)"></textarea>
+    <div id="impResult"></div>
+    <div class="actions">
+      <button id="impExample" type="button">Prøv fiktivt eksempel</button>
+      <button id="impTemplate" type="button">Last ned Excel-mal</button>
+      <span style="flex:1"></span>
+      <button id="impClose" type="button">Lukk</button>
+      <button id="impRun" type="button" class="primary">Bygg</button>
+    </div>
+  </div>
+</div>
+<script src="../src/core.js"></script>
 <script src="../out/data.js"></script>
+<script src="../out/import-config.js"></script>
 <script src="app.js"></script>
+<script src="import.js"></script>
 </body>
 </html>

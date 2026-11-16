@@ -47,7 +47,7 @@ ul.list li { padding: 5px 6px; border-bottom: 1px solid #EEF1F4; cursor: pointer
 ul.list li:hover { background: #F5F7FA; }
 ul.list li.sel { background: #FFF4EC; }
 .sev { display: inline-block; min-width: 64px; font-size: 10px; font-weight: 700; letter-spacing: .03em; }
-.sev.error { color: var(--err); } .sev.warning { color: var(--warn); } .sev.info { color: var(--muted); }
+.sev.error { color: var(--err); } .sev.ok { color: var(--ok); } .sev.warning { color: var(--warn); } .sev.info { color: var(--muted); }
 .chg { display: inline-block; min-width: 64px; font-size: 10px; font-weight: 700; }
 .chg.added { color: var(--ok); } .chg.removed { color: var(--err); } .chg.changed { color: var(--warn); }
 .src { color: var(--muted); font-size: 11px; }
@@ -88,3 +88,24 @@ ul.list li.sel { background: #FFF4EC; }
 .ghost text { fill: var(--err); font-size: 11px; }
 .edge.ghost .ln { stroke: var(--err); stroke-dasharray: 3 3; stroke-width: 1.5; opacity: .8; }
 .badge { font-size: 10px; font-weight: 700; }
+
+/* import */
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.primary:hover { background: #0958A8; }
+.modal { position: fixed; inset: 0; background: rgba(31,41,51,.35); display: flex; align-items: flex-start; justify-content: center; padding: 40px 16px; z-index: 10; overflow: auto; }
+.modal[hidden] { display: none; }
+.dlg { background: #fff; border: 1px solid var(--frame); width: min(980px, 100%); padding: 18px 20px; box-shadow: 0 8px 30px rgba(0,0,0,.12); }
+.dlg h2 { margin: 0 0 4px; font-size: 16px; }
+.drop { border: 1px dashed var(--line); padding: 18px; text-align: center; color: var(--muted); margin: 10px 0; }
+.drop.over { border-color: var(--accent); background: #F0F6FD; }
+.linkbtn { color: var(--accent); text-decoration: underline; cursor: pointer; }
+.tbl { border-collapse: collapse; width: 100%; font-size: 12px; margin: 6px 0; }
+.tbl th, .tbl td { border-bottom: 1px solid #EEF1F4; padding: 4px 6px; text-align: left; vertical-align: top; }
+.tbl th { color: var(--muted); font-weight: 600; }
+.tbl td.cols { color: var(--muted); font-size: 11px; }
+.tbl button { padding: 0 6px; }
+.maprow { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+.maprow label { color: var(--muted); font-size: 12px; display: flex; gap: 6px; align-items: center; }
+#mapText { width: 100%; height: 190px; font: 11px/1.4 Consolas, "Courier New", monospace; border: 1px solid var(--frame); padding: 8px; margin-top: 6px; resize: vertical; }
+.actions { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
+#impResult { margin-top: 8px; font-size: 12px; }

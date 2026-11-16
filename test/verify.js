@@ -100,5 +100,32 @@ ok(refsOk, 'alle source/target/parent-referanser finnes');
 ok(bm.equipment.size && Array.from(bm.equipment.keys()).every(t => diagrams[0].indexOf('dev-' + t) >= 0), 'side 1 inneholder alt utstyr');
 ok(/W-110-210/.test(diagrams[2]) && /SRV-110-01/.test(diagrams[2]) && /CAM-211/.test(diagrams[2]), 'side 3 viser L-001 med kabeltagger');
 
-console.log(`\nResultat: ${pass} OK, ${fail} feil`);
-process.exit(fail ? 1 : 0);
+(async () => {
+  console.log('\n8. Import med kolonnemapping (CSV og Excel)');
+  const zlib = require('zlib');
+  const inflate = async b => new Uint8Array(zlib.inflateRawSync(b));
+  const exDir = path.join(ROOT, 'data', 'import-eksempel');
+  const mapping = JSON.parse(fs.readFileSync(path.join(ROOT, 'mappings', 'eksempel-eksport.json'), 'utf8'));
+  const sig = r => JSON.stringify(r.model.channels.map(ECE.channelText));
+  const t = {};
+  fs.readdirSync(exDir).filter(f => f.endsWith('.csv')).forEach(f => { t[f] = ECE.parseCSV(ECE.decodeText(fs.readFileSync(path.join(exDir, f))), f); });
+  ok(ECE.detectDelimiter(fs.readFileSync(path.join(exDir, 'Objekter.csv'), 'utf8')) === ';', 'semikolon-CSV gjenkjennes');
+  const a = ECE.runImport(t, mapping);
+  ok(a.model.summary.errors === 0 && sig(a) === sig(base), 'fremmed CSV-format + mapping gir samme 12 kanaler som basis');
+  ok(a.model.links.find(l => l.id === 'PC-210-001').length === 0.5, 'desimalkomma «0,5» leses som 0.5');
+  ok(a.model.issues.filter(i => i.code === 'PORTS_DERIVED').length === 7, 'utledede porter (7 kameraer) vises som INFO');
+  const x = await ECE.readXlsx(new Uint8Array(fs.readFileSync(path.join(exDir, 'eksempel-eksport.xlsx'))), inflate);
+  ok(sig(ECE.runImport(x, mapping)) === sig(base), 'Excel-arbeidsbok (.xlsx) gir samme resultat');
+  const tpl = await ECE.readXlsx(ECE.buildTemplateXlsx(base.raw), inflate);
+  ok(sig(ECE.runImport(tpl, ECE.DEFAULT_MAPPING)) === sig(base), 'Excel-mal med kanoniske ark + standardmapping gir samme resultat');
+  const bad = JSON.parse(JSON.stringify(mapping));
+  bad.tables.equipment.columns.rack_u = 'U-pos';
+  const t2 = Object.assign({}, t); delete t2['Lokasjoner.csv'];
+  const bi = ECE.runImport(t2, bad).model.issues;
+  ok(bi.some(i => i.code === 'MAPPING_COLUMN' && /U-pos/.test(i.message)) && bi.some(i => i.code === 'MAPPING_TABLE' && /Lokasjoner/.test(i.message)), 'manglende kolonne og tabell rapporteres som feil');
+  const zipped = await ECE.readZip(ECE.makeZip([['a.txt', 'æøå']]), inflate);
+  ok((await zipped.text('a.txt')) === 'æøå', 'zip rundtur (UTF-8)');
+
+  console.log(`\nResultat: ${pass} OK, ${fail} feil`);
+  process.exit(fail ? 1 : 0);
+})();

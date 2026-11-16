@@ -1,0 +1,70 @@
+{
+  "name": "Eksempel-eksport (fiktivt format – tilpass til faktisk PATCH MANAGER-eksport)",
+  "description": "Viser hvordan kolonnenavn, verdier og tabeller fra en annen eksport kobles til den kanoniske modellen. Kolonnenavnene er oppdiktet.",
+  "derivePorts": true,
+  "tables": {
+    "rooms": {
+      "source": ["Lokasjoner"],
+      "columns": { "room_id": "Rom-ID", "name": "Romnavn", "area": "Område" }
+    },
+    "cabinets": {
+      "source": ["Skap"],
+      "columns": { "cabinet_id": "Skap-ID", "room_id": "I rom", "name": "Skapnavn", "height_u": "Høyde (HE)" }
+    },
+    "equipment": {
+      "source": ["Objekter"],
+      "columns": {
+        "tag": "Objekt-ID",
+        "description": "Beskrivelse",
+        "type": {
+          "column": "Objekttype",
+          "map": {
+            "Svitsj": "switch",
+            "Server": "server",
+            "IP-kamera": "camera",
+            "Operatørstasjon": "operator_station",
+            "Fiberpanel": "fiber_patch_panel",
+            "Kobberpanel": "copper_patch_panel"
+          }
+        },
+        "system": "System",
+        "room_id": "Rom",
+        "cabinet_id": "Skap",
+        "rack_u": { "column": "HE-posisjon", "number": true },
+        "ports": "Porter",
+        "model": "Modell"
+      }
+    },
+    "cables": {
+      "source": ["Forbindelser"],
+      "where": { "column": "Kategori", "equals": "Kabel" },
+      "columns": {
+        "cable_tag": "Forbindelse-ID",
+        "from_tag": "Fra objekt", "from_port": "Fra port",
+        "to_tag": "Til objekt", "to_port": "Til port",
+        "cable_type": "Kabeltype",
+        "length_m": { "column": "Lengde (m)", "number": true }
+      }
+    },
+    "patching": {
+      "source": ["Forbindelser"],
+      "where": { "column": "Kategori", "equals": "Patch" },
+      "columns": {
+        "patch_tag": "Forbindelse-ID",
+        "from_tag": "Fra objekt", "from_port": "Fra port",
+        "to_tag": "Til objekt", "to_port": "Til port",
+        "cable_type": "Kabeltype",
+        "length_m": { "column": "Lengde (m)", "number": true }
+      }
+    },
+    "internal": {
+      "source": ["Paneltilkoblinger"],
+      "columns": { "tag": "Panel", "port_a": "Front", "port_b": "Bak", "note": "Merknad" }
+    },
+    "logical_links": {
+      "source": ["Tjenester"],
+      "optional": true,
+      "columns": { "link_id": "Tjeneste-ID", "from_tag": "Kilde", "to_tag": "Mål", "service": "Tjeneste", "note": "Merknad" }
+    }
+  }
+}

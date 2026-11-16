@@ -56,7 +56,7 @@ function main() {
   fs.writeFileSync(path.join(OUT, 'rapport-feil.md'), results.errors.report);
   fs.writeFileSync(path.join(OUT, 'rapport-rev-b.md'), results.revb.report);
   fs.writeFileSync(path.join(OUT, 'endringer-rev-b.md'), ECE.buildDiffReport(diff));
-  fs.writeFileSync(path.join(OUT, 'kabelliste-basis.csv'), cableCsv(results.base.model));
+  fs.writeFileSync(path.join(OUT, 'kabelliste-basis.csv'), ECE.buildCableCsv(results.base.model));
 
   const web = {
     generated: 'deterministisk fra CSV i data/',
@@ -67,6 +67,13 @@ function main() {
   for (const k of Object.keys(results)) {
     web.datasets[k] = { title: results[k].ds.title, model: ECE.modelToJSON(results[k].model), layout: results[k].layout };
   }
+  // mappinger og fiktivt importeksempel til nettleserens importdialog
+  const mappings = {};
+  fs.readdirSync(path.join(ROOT, 'mappings')).filter(f => f.endsWith('.json')).sort().forEach(f => { mappings[f.replace(/\.json$/, '')] = JSON.parse(fs.readFileSync(path.join(ROOT, 'mappings', f), 'utf8')); });
+  const exDir = path.join(DATA, 'import-eksempel'), example = {};
+  if (fs.existsSync(exDir)) fs.readdirSync(exDir).filter(f => f.endsWith('.csv')).sort().forEach(f => { example[f] = fs.readFileSync(path.join(exDir, f), 'utf8').replace(/^\uFEFF/, ''); });
+  fs.writeFileSync(path.join(OUT, 'import-config.js'), 'window.ECE_MAPPINGS = ' + JSON.stringify(mappings) + ';\nwindow.ECE_IMPORT_EXAMPLE = ' + JSON.stringify(example) + ';\n');
+
   fs.writeFileSync(path.join(OUT, 'data.js'), 'window.ECE_DATA = ' + JSON.stringify(web) + ';\n');
 
   // konsollsammendrag
@@ -79,14 +86,5 @@ function main() {
   console.log('Skrevet til ' + path.relative(process.cwd(), OUT) + '/');
 }
 
-function cableCsv(model) {
-  const q = v => /[",\n]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v);
-  const rows = [['tag', 'kategori', 'fra_tag', 'fra_port', 'fra_rom', 'til_tag', 'til_port', 'til_rom', 'type', 'lengde_m', 'status']];
-  model.links.slice().sort((a, b) => a.id.localeCompare(b.id)).forEach(l => {
-    const ra = model.equipment.get(l.a.tag), rb = model.equipment.get(l.b.tag);
-    rows.push([l.id, l.kind === 'cable' ? 'kabel' : 'patch', l.a.tag, l.a.port, ra ? ra.room : '', l.b.tag, l.b.port, rb ? rb.room : '', l.cableType, l.length == null ? '' : l.length, l.problems.join('; ') || 'OK']);
-  });
-  return rows.map(r => r.map(q).join(',')).join('\n') + '\n';
-}
 
 main();
