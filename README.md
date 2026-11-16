@@ -4,6 +4,11 @@ Demonstrator som viser hvordan strukturerte utstyrs- og kabeldata (slik de finne
 automatisk kan bli blokkdiagrammer, redigerbare draw.io-tegninger og dokumentasjon.
 **Kun fiktive data. Ingen tilkobling til eksterne systemer.**
 
+## Uten Node, npm eller git (låst maskin)
+
+Åpne **`out/engineering-connection-explorer.html`** direkte i nettleseren. Én fil med visning, data og nedlastbare `.drawio`-filer og rapporter innebygd. Det trengs ingen installasjon eller server, og den gjør ingen nettverkskall.
+Filen lages av `npm run build` (`src/build-standalone.js`).
+
 ## Start
 
 Krever Node.js 18 eller nyere. Prosjektet har ingen avhengigheter, så `npm install` trengs ikke.
@@ -16,7 +21,7 @@ npm start
 
 | Kommando | Hva den gjør |
 |---|---|
-| `npm run build` | Genererer `out/` (modell, `.drawio`, rapporter, data til visningen) |
+| `npm run build` | Genererer `out/` (modell, `.drawio`, rapporter, data til visningen og frittstående HTML) |
 | `npm test` | Bygger og kjører 41 automatiske kontroller |
 | `npm run n8n` | Genererer n8n-workflowen i `n8n/` fra samme kjerne og data |
 

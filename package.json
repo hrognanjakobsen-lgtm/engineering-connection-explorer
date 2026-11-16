@@ -4,7 +4,7 @@
   "description": "Demonstrator: strukturerte utstyrs- og kabeldata til blokkdiagram, draw.io og dokumentasjon. Kun fiktive data.",
   "private": true,
   "scripts": {
-    "build": "node src/build.js",
+    "build": "node src/build.js && node src/build-standalone.js",
     "start": "node src/build.js && node src/serve.js",
     "test": "node src/build.js && node test/verify.js",
     "n8n": "node src/build-n8n.js"
